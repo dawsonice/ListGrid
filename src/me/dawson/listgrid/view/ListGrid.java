@@ -4,6 +4,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import android.content.Context;
+import android.database.DataSetObserver;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
@@ -21,8 +22,10 @@ public class ListGrid extends ListView {
 	private ListAdapter mockAdapter;
 	private BaseAdapter realAdapter;
 	private OnItemClickListener itemClickListener;
+	private OnItemLongClickListener itemLongClickListener;
 
-	class InnerAdapter extends BaseAdapter implements OnClickListener {
+	class InnerAdapter extends BaseAdapter implements OnClickListener,
+			OnLongClickListener {
 
 		private int realCount;
 
@@ -86,8 +89,10 @@ public class ListGrid extends ListView {
 			container.removeAllViews();
 
 			int containerCount = rowCount;
-			if (position == (getCount() - 1)) {
-				containerCount = realCount % rowCount;
+			int modCount = realCount % rowCount;
+			boolean lastItem = position == (getCount() - 1);
+			if (lastItem && modCount != 0) {
+				containerCount = modCount;
 			}
 
 			for (int index = 0; index < containerCount; ++index) {
@@ -102,6 +107,7 @@ public class ListGrid extends ListView {
 				LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
 						width, LinearLayout.LayoutParams.MATCH_PARENT);
 				childView.setOnClickListener(this);
+				childView.setOnLongClickListener(this);
 				childView.setTag(realPos);
 				// lp.weight = 1.0f;
 				container.addView(childView, index, lp);
@@ -117,6 +123,16 @@ public class ListGrid extends ListView {
 				itemClickListener.onItemClick(ListGrid.this, v, realPos,
 						v.getId());
 			}
+		}
+
+		@Override
+		public boolean onLongClick(View v) {
+			int realPos = (Integer) v.getTag();
+			if (itemLongClickListener != null) {
+				itemLongClickListener.onItemLongClick(ListGrid.this, v,
+						realPos, v.getId());
+			}
+			return false;
 		}
 	};
 
@@ -138,7 +154,7 @@ public class ListGrid extends ListView {
 	private void init() {
 		rowCount = 1;
 		realAdapter = new InnerAdapter();
-		super.setAdapter(realAdapter);
+		realAdapter.notifyDataSetChanged();
 	}
 
 	public int getRowCount() {
@@ -152,10 +168,30 @@ public class ListGrid extends ListView {
 	@Override
 	public void setAdapter(ListAdapter adapter) {
 		this.mockAdapter = adapter;
+		mockAdapter.registerDataSetObserver(new DataSetObserver() {
+
+			@Override
+			public void onChanged() {
+				Log.d(TAG, "onChanged ");
+				realAdapter.notifyDataSetChanged();
+			}
+
+			@Override
+			public void onInvalidated() {
+				Log.d(TAG, "onInvalidated ");
+				realAdapter.notifyDataSetInvalidated();
+			}
+
+		});
+		super.setAdapter(realAdapter);
 	}
 
 	@Override
 	public void setOnItemClickListener(OnItemClickListener listener) {
 		itemClickListener = listener;
+	}
+
+	public void setOnItemLongClickListener(OnItemLongClickListener listener) {
+		itemLongClickListener = listener;
 	}
 }
